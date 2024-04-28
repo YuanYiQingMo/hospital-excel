@@ -13,6 +13,15 @@ const headerList = ref([])
 const updateComplete = ref(false)
 const selectedHead = ref([])
 const selectedHeadIndex = ref([])
+const opts = ref([
+  {
+    key: 0,
+    label: '手术信息提取',
+    description: '提取含有关键词的手术信息',
+    value: '',
+    enable: false
+  }
+])
 
 const shell = inject('$shell')
 const path = inject('$path')
@@ -99,9 +108,21 @@ const analysis = () => {
   updateComplete.value = true
   // console.log(selectedHead)
 }
+
 const output = () => {
   const FileHandler = new handleFile()
-  FileHandler.output([...selectedHead.value], outputPath)
+  if (opts.value[0].enable) {
+    if (selectedHead.value.indexOf('手术日期') == -1) {
+      selectedHead.value.push('手术日期')
+    }
+    if (selectedHead.value.indexOf('手术名称') == -1) {
+      selectedHead.value.push('手术名称')
+    }
+    if (selectedHead.value.indexOf('麻醉方式') == -1) {
+      selectedHead.value.push('麻醉方式')
+    }
+  }
+  FileHandler.output([...selectedHead.value], outputPath, [...opts.value])
 }
 
 const selectedHeadChange = (
@@ -126,8 +147,8 @@ onMounted(() => {
   <!-- <img alt="logo" class="logo" src="./assets/electron.svg" /> -->
   <!-- <div class="creator">Powered by electron-vite</div> -->
   <div class="text">
-    Build an Electron app with
-    <span class="vue">Vue</span>
+    <span class="vue">excel</span>
+    数据处理
   </div>
   <!-- <p class="tip">Please try pressing <code>F12</code> to open the devTool</p> -->
   <div class="actions">
@@ -143,7 +164,7 @@ onMounted(() => {
     </div>
     <div class="action submit-file">
       <el-tooltip content="确保全部文件都已放入对应文件夹开始分析文件" placement="top">
-        <a id="submit-file" @click="analysis">分析文件</a>
+        <a id="submit-file" @click="analysis">加载文件</a>
       </el-tooltip>
     </div>
   </div>
@@ -154,51 +175,41 @@ onMounted(() => {
   </el-row> -->
   <el-tabs :stretch="true" style="margin-top: 24px; width: 80vw" type="border-card">
     <el-tab-pane label="选择需导出表头">
-      <el-text class="mx-1" type="warning" v-show="!updateComplete">暂无数据</el-text>
-      <el-transfer
-        @change="selectedHeadChange"
-        v-show="updateComplete"
-        v-model="selectedHeadIndex"
-        :data="headerList"
-        :titles="['待选表头', '已选表头']"
-        :right-default-checked="[0]"
-      />
+      <el-scrollbar height="320px">
+        <el-text class="mx-1" type="warning" v-show="!updateComplete">暂无数据,请先使用加载文件按钮加载文件夹中的文件</el-text>
+        <el-transfer
+          filterable
+          @change="selectedHeadChange"
+          v-show="updateComplete"
+          v-model="selectedHeadIndex"
+          :data="headerList"
+          :titles="['待选表头', '已选表头']"
+          :right-default-checked="[0]"
+        />
+      </el-scrollbar>
     </el-tab-pane>
     <el-tab-pane label="高级设置">
-      <el-scrollbar height="300px">
-        <el-text class="mx-1" type="warning" v-show="!selectedHead.length">暂无数据</el-text>
-        <el-row v-show="selectedHead.length" class="output-opts">
+      <el-scrollbar height="320px">
+        <el-row class="output-opts">
           <el-col :span="22">
             <el-row
               :gutter="6"
               type="flex"
               align="middle"
               style="margin-top: 8px"
-              v-for="item in selectedHead"
+              v-for="item in opts"
             >
-              <el-col :span="8">
+              <el-col :span="2">
+                <el-switch v-model="item.enable" />
+              </el-col>
+              <el-col style="font-weight: bolder" :span="4">
                 {{ item.label }}
               </el-col>
+              <el-col style="font-size: 12px; display: flex; justify-content: center" :span="10">
+                {{ item.description }}
+              </el-col>
               <el-col :span="8">
-                <el-select v-model="item.types">
-                  <el-option :label="`文本`" :value="1"></el-option>
-                  <el-option :label="`数字`" :value="2"></el-option>
-                  <el-option :label="`日期`" :value="3"></el-option>
-                </el-select>
-              </el-col>
-              <el-col v-show="selectedHead.length && item.types == 1" :span="8">
-                <el-input v-model="item.option.text" style="width: 90%" placeholder="输入关键字" />
-              </el-col>
-              <el-col v-show="selectedHead.length && item.type == 2" :span="8">
-                <el-input
-                  v-model="item.option.numStart"
-                  style="width: 45%"
-                  placeholder="起始数值"
-                />
-                <el-input v-model="item.option.numEnd" style="width: 45%" placeholder="结束数值" />
-              </el-col>
-              <el-col v-show="selectedHead.length && item.type == 3" :span="8">
-                <el-input v-model="item.option.num" style="width: 45%" placeholder="Please input" />
+                <el-input v-model="item.value" style="width: 100%" placeholder="输入要匹配的文字" />
               </el-col>
             </el-row>
           </el-col>
@@ -212,7 +223,7 @@ onMounted(() => {
         <el-text type="danger">确保全部文件都已放入对应文件夹开始分析文件</el-text><br />
         <el-text type="warning">未设置高级选项将会合并表格</el-text>
       </template>
-      <a @click="output">导出总表</a>
+      <a style="color: red" @click="output">导出总表</a>
     </el-tooltip>
   </div>
 </template>

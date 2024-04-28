@@ -3,7 +3,7 @@ let instance
 import { ElNotification } from 'element-plus'
 import { h } from 'vue'
 
-const electron = require('electron')
+const { shell } = require('electron')
 const fs = require('fs')
 const XLSX = require('xlsx')
 
@@ -113,14 +113,25 @@ class handleFile {
       })
     }
     this.allHeader = res
-    console.log(res)
+    // console.log(res)
     return res
   }
 
-  output(selectedHead, outPath) {
+  async outputFile(res, outPath, fileName) {
+    const SHEET = XLSX.utils.aoa_to_sheet(res)
+    let outputPath = `${outPath}\\${fileName}.xlsx`
+    const BOOK = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(BOOK, SHEET, 'Data')
+    // console.log(SHEET, outputPath)
+    XLSX.writeFile(BOOK, outputPath, {
+      bookType: 'xlsx'
+    })
+  }
+
+  output(selectedHead, outPath, opts) {
     if (selectedHead[0].label != '住院号') {
       ElNotification({
-        title: '勾选住院号',
+        title: '请勾选住院号',
         message: h('i', { style: 'color: red' }, '住院号是必须的'),
         type: 'error',
         duration: 3000
@@ -135,7 +146,9 @@ class handleFile {
       let xdata = XLSX.readFile(this.mainFileList[fileIndex])
       /* first worksheet */
       const first_sheet = xdata.Sheets[xdata.SheetNames[0]]
-      const aoo = XLSX.utils.sheet_to_json(first_sheet, { header: 1 })
+      // console.log(first_sheet)
+      const aoo = XLSX.utils.sheet_to_json(first_sheet, { header: 1,raw:false })
+      // console.log(aoo)
       /* generate array of arrays */
       for (let item of aoo) {
         if (item.length == 1) {
@@ -165,37 +178,70 @@ class handleFile {
       for (let i = 1; i < res.length - 1; i++) {
         ProcessedSheet.push(res[i])
         count = 0
-        while (res[i][res[0].indexOf('住院号')] == res[i + 1][res[0].indexOf('住院号')]) {
-          count++
-          if (count > maxOperation) {
-            maxOperation = count
-            res[0].push(...[`手术日期${count + 1}`, `手术名称${count + 1}`, `麻醉方式${count + 1}`])
-          }
-          try {
-            ProcessedSheet[ProcessedSheet.length - 1].push(res[i + 1][res[0].indexOf('手术日期')])
-            ProcessedSheet[ProcessedSheet.length - 1].push(res[i + 1][res[0].indexOf('手术名称')])
-            ProcessedSheet[ProcessedSheet.length - 1].push(res[i + 1][res[0].indexOf('麻醉方式')])
-          } catch (e) {
-            console.log(e)
-            ElNotification({
-              title: '请同时勾选手术名称、手术日期、麻醉方式三项,如不需导出手术数据要请无视此报错',
-              message: h('i', { style: 'color: red' }, `${e}`),
-              type: 'error',
-              duration: 3000
-            })
-          }
-          i++
-          if (i > res.length - 1) {
-            break
+        if (
+          res[i][res[0].indexOf('手术名称')] != -1 ||
+          res[i][res[0].indexOf('手术日期')] != -1 ||
+          res[i][res[0].indexOf('麻醉方式')] != -1
+        ) {
+          while (res[i][res[0].indexOf('住院号')] == res[i + 1][res[0].indexOf('住院号')]) {
+            count++
+            if (count > maxOperation) {
+              maxOperation = count
+              res[0].push(
+                ...[`手术日期${count + 1}`, `手术名称${count + 1}`, `麻醉方式${count + 1}`]
+              )
+            }
+            try {
+              ProcessedSheet[ProcessedSheet.length - 1].push(
+                res[i + 1][res[0].indexOf('手术日期')] || ''
+              )
+              ProcessedSheet[ProcessedSheet.length - 1].push(
+                res[i + 1][res[0].indexOf('手术名称')] || ''
+              )
+              ProcessedSheet[ProcessedSheet.length - 1].push(
+                res[i + 1][res[0].indexOf('麻醉方式')] || ''
+              )
+            } catch (e) {
+              console.log(e)
+              ElNotification({
+                title:
+                  '请同时勾选手术名称、手术日期、麻醉方式三项,如不需导出手术数据要请无视此报错',
+                message: h('i', { style: 'color: red' }, `${e}`),
+                type: 'error',
+                duration: 3000
+              })
+            }
+            i++
+            if (i > res.length - 1) {
+              break
+            }
           }
         }
       }
-      console.log(ProcessedSheet)
+      // console.log(aoo)
+      if (opts[0].enable) {
+        let filterList = []
+        let searchItemIndex = []
+        searchItemIndex = aoo[0].filter((item) => item.match(/手术名称|手术日期|麻醉方式/))
+        let reg = new RegExp(opts[0].value)
+        for (let item of searchItemIndex) {
+          for (let i = 1; i < aoo.length; i++) {
+            // console.log(ProcessedSheet[i],[ProcessedSheet[0].indexOf(item)])
+            if (`${aoo[i][aoo[0].indexOf(item)]}`.match(reg)) {
+              filterList.push([])
+              for (let selectItem of selectedHead) {
+                filterList[filterList.length - 1].push(aoo[i][aoo[0].indexOf(selectItem.label)])
+              }
+            }
+          }
+        }
+        this.outputFile(filterList, outPath, '总表数据(筛选手术)')
+      }
       xdata = null
     }
-    //总表搜索
-    
+    this.outputFile(ProcessedSheet, outPath, '总表数据')
     //个人表单处理
+    return
     for (let fileIndex = 0; fileIndex < this.detailsFileList.length; fileIndex++) {
       let xdata = XLSX.readFile(this.detailsFileList[fileIndex])
       /* first worksheet */
