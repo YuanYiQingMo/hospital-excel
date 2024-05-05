@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, inject, ref } from 'vue'
+import { onMounted, inject, ref, handleError } from 'vue'
 import handleFile from './plugin/handleFile.js'
 import { h } from 'vue'
 import { ElNotification } from 'element-plus'
+import { filterFields } from 'element-plus/es/components/form/src/utils.mjs'
 
 let homeDir = ''
 let mainPath = ''
@@ -13,12 +14,20 @@ const headerList = ref([])
 const updateComplete = ref(false)
 const selectedHead = ref([])
 const selectedHeadIndex = ref([])
+const detailList = ref([])
 const opts = ref([
   {
     key: 0,
     label: '手术信息提取',
     description: '提取含有关键词的手术信息',
     value: '',
+    enable: false
+  },
+  {
+    key: 1,
+    label: '导出病人表单数据',
+    description: '选择需要导出的项(导出最近一次检查结果)',
+    value: [],
     enable: false
   }
 ])
@@ -105,6 +114,7 @@ const analysis = () => {
   const FileHandler = new handleFile(mainPath, detailPath)
   // console.log(data)
   headerList.value = FileHandler.getMainHeader()
+  detailList.value = FileHandler.getDetailsHeader()
   updateComplete.value = true
   // console.log(selectedHead)
 }
@@ -137,6 +147,12 @@ const selectedHeadChange = (
   }
   selectedHead.value = res
   // console.log(selectedHead)
+}
+
+const updateDetailsList = () => {
+  const FileHandler = new handleFile();
+  // console.log()
+  FileHandler.updateDetails(opts.value[1])
 }
 onMounted(() => {
   init()
@@ -176,7 +192,9 @@ onMounted(() => {
   <el-tabs :stretch="true" style="margin-top: 24px; width: 80vw" type="border-card">
     <el-tab-pane label="选择需导出表头">
       <el-scrollbar height="320px">
-        <el-text class="mx-1" type="warning" v-show="!updateComplete">暂无数据,请先使用加载文件按钮加载文件夹中的文件</el-text>
+        <el-text class="mx-1" type="warning" v-show="!updateComplete"
+          >暂无数据,请先使用加载文件按钮加载文件夹中的文件</el-text
+        >
         <el-transfer
           filterable
           @change="selectedHeadChange"
@@ -209,7 +227,29 @@ onMounted(() => {
                 {{ item.description }}
               </el-col>
               <el-col :span="8">
-                <el-input v-model="item.value" style="width: 100%" placeholder="输入要匹配的文字" />
+                <!-- 手术信息提取 -->
+                <el-input
+                  v-show="item.key == 0"
+                  v-model="item.value"
+                  style="width: 100%"
+                  placeholder="输入要匹配的文字"
+                />
+                <!-- TODO提取病人信息 -->
+                <!-- <el-select
+                  @change="updateDetailsList"
+                  v-show="item.key == 1"
+                  v-model="item.value"
+                  multiple
+                  placeholder="选取病人信息"
+                  style="width: 100%"
+                >
+                  <el-option
+                    v-for="detail in detailList"
+                    :key="detail.value"
+                    :label="detail.label"
+                    :value="detail.value"
+                  />
+                </el-select> -->
               </el-col>
             </el-row>
           </el-col>

@@ -18,8 +18,11 @@ class handleFile {
     this.detailsFileList = []
     this.headData = []
     this.allHeader = []
+    this.allDetails = []
     this.headMainList = []
     this.detailsHeadList = []
+    this.processedResult = []
+    this.detailsFilterList = []
   }
 
   async getAllPath() {
@@ -41,10 +44,8 @@ class handleFile {
     this.getAllPath()
     for (let i = 0; i < this.detailsFileList.length; i++) {
       let xdata = XLSX.readFile(this.detailsFileList[i])
-      /* first worksheet */
       const first_sheet = xdata.Sheets[xdata.SheetNames[0]]
       const aoo = XLSX.utils.sheet_to_json(first_sheet, { header: 1 })
-      /* generate array of arrays */
       for (let item of aoo) {
         if (item.length == 1) {
           continue
@@ -62,18 +63,12 @@ class handleFile {
     // type 1：文本 2：数字 3：日期
     for (let i = 0; i < result.length; i++) {
       res.push({
-        key: i,
+        key: result[i],
         label: result[i],
-        types: 1,
-        option: {
-          numStart: 0,
-          numEnd: 0,
-          date: 0,
-          text: ``
-        }
+        value: result[i]
       })
     }
-    this.allHeader = res
+    this.allDetails = res
     return res
   }
   getMainHeader() {
@@ -119,13 +114,21 @@ class handleFile {
 
   async outputFile(res, outPath, fileName) {
     const SHEET = XLSX.utils.aoa_to_sheet(res)
-    let outputPath = `${outPath}\\${fileName}.xlsx`
+    let date = new Date()
+    date = date.toLocaleString().replace(/[\s\/]/g, '-')
+    let outputPath = `${outPath}\\${date}_${fileName}.xlsx`
     const BOOK = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(BOOK, SHEET, 'Data')
-    // console.log(SHEET, outputPath)
     XLSX.writeFile(BOOK, outputPath, {
       bookType: 'xlsx'
     })
+    ElNotification({
+      title: '导出成功',
+      message: h('i', { style: 'color: red' }, `打开输出文件夹查看`),
+      type: 'success',
+      duration: 3000
+    })
+    shell.openPath(outPath)
   }
 
   output(selectedHead, outPath, opts) {
@@ -140,16 +143,13 @@ class handleFile {
     }
     let res = []
     let ProcessedSheet
+    let filterList = []
     //总表处理
     for (let fileIndex = 0; fileIndex < this.mainFileList.length; fileIndex++) {
       let fileHeads = []
       let xdata = XLSX.readFile(this.mainFileList[fileIndex])
-      /* first worksheet */
       const first_sheet = xdata.Sheets[xdata.SheetNames[0]]
-      // console.log(first_sheet)
-      const aoo = XLSX.utils.sheet_to_json(first_sheet, { header: 1,raw:false })
-      // console.log(aoo)
-      /* generate array of arrays */
+      const aoo = XLSX.utils.sheet_to_json(first_sheet, { header: 1, raw: false })
       for (let item of aoo) {
         if (item.length == 1) {
           continue
@@ -175,7 +175,7 @@ class handleFile {
       ProcessedSheet = [res[0]]
       let maxOperation = 0
       let count = 0
-      for (let i = 1; i < res.length - 1; i++) {
+      for (let i = 1; i < res.length; i++) {
         ProcessedSheet.push(res[i])
         count = 0
         if (
@@ -183,7 +183,10 @@ class handleFile {
           res[i][res[0].indexOf('手术日期')] != -1 ||
           res[i][res[0].indexOf('麻醉方式')] != -1
         ) {
-          while (res[i][res[0].indexOf('住院号')] == res[i + 1][res[0].indexOf('住院号')]) {
+          while (
+            i + 1 < res.length &&
+            res[i][res[0].indexOf('住院号')] == res[i + 1][res[0].indexOf('住院号')]
+          ) {
             count++
             if (count > maxOperation) {
               maxOperation = count
@@ -212,50 +215,57 @@ class handleFile {
               })
             }
             i++
-            if (i > res.length - 1) {
-              break
-            }
           }
         }
       }
-      // console.log(aoo)
+    ProcessedSheet = this.fillList(ProcessedSheet)
       if (opts[0].enable) {
-        let filterList = []
         let searchItemIndex = []
-        searchItemIndex = aoo[0].filter((item) => item.match(/手术名称|手术日期|麻醉方式/))
+        searchItemIndex = ProcessedSheet[0].filter((item) => item.match(/手术名称|手术日期|麻醉方式/))
         let reg = new RegExp(opts[0].value)
         for (let item of searchItemIndex) {
-          for (let i = 1; i < aoo.length; i++) {
-            // console.log(ProcessedSheet[i],[ProcessedSheet[0].indexOf(item)])
-            if (`${aoo[i][aoo[0].indexOf(item)]}`.match(reg)) {
+          for (let i = 1; i < ProcessedSheet.length; i++) {
+            if (`${ProcessedSheet[i][ProcessedSheet[0].indexOf(item)]}`.match(reg)) {
               filterList.push([])
               for (let selectItem of selectedHead) {
-                filterList[filterList.length - 1].push(aoo[i][aoo[0].indexOf(selectItem.label)])
+                filterList[filterList.length - 1].push(ProcessedSheet[i][ProcessedSheet[0].indexOf(selectItem.label)])
               }
             }
           }
         }
-        this.outputFile(filterList, outPath, '总表数据(筛选手术)')
+      }
+      if (opts[1].enable) {
       }
       xdata = null
+    }
+    if (filterList.length != 0) {
+      this.outputFile(filterList, outPath, '总表数据(高级筛选)')
     }
     this.outputFile(ProcessedSheet, outPath, '总表数据')
     //个人表单处理
     return
-    for (let fileIndex = 0; fileIndex < this.detailsFileList.length; fileIndex++) {
-      let xdata = XLSX.readFile(this.detailsFileList[fileIndex])
-      /* first worksheet */
-      const first_sheet = xdata.Sheets[xdata.SheetNames[0]]
-      const aoo = XLSX.utils.sheet_to_json(first_sheet, { header: 1 })
-      /* generate array of arrays */
-      for (let item of aoo) {
-        if (item.length == 1) {
-          continue
-        }
-        this.headList.push(...item)
-        break
+  }
+  updateDetails(detailsList) {
+    this.detailsFilterList = [...detailsList.value]
+    // console.log(this.detailsFilterList)
+  }
+  // @param list [[]]
+  fillList(list) {
+    let maxLength = 0
+    console.log(list)
+    for (let item of list) {
+      if (item.length > maxLength) {
+        maxLength = item.length
       }
     }
+    for (let item of list) {
+      if (item.length < maxLength) {
+        for (let i = item.length; i < maxLength; i++) {
+          item.push('')
+        }
+      }
+    }
+    return list;
   }
 }
 
