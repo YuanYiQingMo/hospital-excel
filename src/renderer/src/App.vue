@@ -3,7 +3,7 @@ import { onMounted, inject, ref, handleError } from 'vue'
 import handleFile from './plugin/handleFile.js'
 import { h } from 'vue'
 import { ElNotification } from 'element-plus'
-import { filterFields } from 'element-plus/es/components/form/src/utils.mjs'
+// import { filterFields } from 'element-plus/es/components/form/src/utils.mjs'
 
 let homeDir = ''
 let mainPath = ''
@@ -19,7 +19,7 @@ const opts = ref([
   {
     key: 0,
     label: '手术信息提取',
-    description: '提取含有关键词的手术信息',
+    description: '提取含有关键词的手术信息（请确保勾选手术日期、手术方式、麻醉方式三项）',
     value: '',
     enable: false
   },
@@ -121,17 +121,6 @@ const analysis = () => {
 
 const output = () => {
   const FileHandler = new handleFile()
-  if (opts.value[0].enable) {
-    if (selectedHead.value.indexOf('手术日期') == -1) {
-      selectedHead.value.push('手术日期')
-    }
-    if (selectedHead.value.indexOf('手术名称') == -1) {
-      selectedHead.value.push('手术名称')
-    }
-    if (selectedHead.value.indexOf('麻醉方式') == -1) {
-      selectedHead.value.push('麻醉方式')
-    }
-  }
   FileHandler.output([...selectedHead.value], outputPath, [...opts.value])
 }
 
@@ -140,7 +129,7 @@ const selectedHeadChange = (
   direction: 'left' | 'right',
   movedKeys: string[] | number[]
 ) => {
-  console.log(value, direction, movedKeys)
+  // console.log(value, direction, movedKeys)
   let res = []
   for (let item of selectedHeadIndex.value) {
     res.push(headerList.value[item])
@@ -223,7 +212,7 @@ onMounted(() => {
               <el-col style="font-weight: bolder" :span="4">
                 {{ item.label }}
               </el-col>
-              <el-col style="font-size: 12px; display: flex; justify-content: center" :span="10">
+              <el-col style="font-size: 12px; display: flex; justify-content: center; color: yellow;" :span="10">
                 {{ item.description }}
               </el-col>
               <el-col :span="8">

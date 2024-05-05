@@ -1,6 +1,7 @@
 let instance
 
 import { ElNotification } from 'element-plus'
+// import { fi } from 'element-plus/es/locales.mjs'
 import { h } from 'vue'
 
 const { shell } = require('electron')
@@ -27,23 +28,23 @@ class handleFile {
 
   async getAllPath() {
     let filesMain = fs.readdirSync(this.mainPath)
+    this.mainFileList = []
     filesMain.forEach((item) => {
       item = this.mainPath + '\\' + item
-      this.mainFileList = []
       this.mainFileList.push(item)
     })
     let filesDetails = fs.readdirSync(this.detailsPath)
+    this.detailsFileList = []
     filesDetails.forEach((item) => {
-      item = this.detailsPath + '\\' + item
-      this.detailsFileList = []
-      this.detailsFileList.push(item)
+      let path = this.detailsPath + '\\' + item
+      this.detailsFileList.push({ path: path, name: item })
     })
   }
   getDetailsHeader() {
     this.detailsHeadList = []
     this.getAllPath()
     for (let i = 0; i < this.detailsFileList.length; i++) {
-      let xdata = XLSX.readFile(this.detailsFileList[i])
+      let xdata = XLSX.readFile(this.detailsFileList[i].path)
       const first_sheet = xdata.Sheets[xdata.SheetNames[0]]
       const aoo = XLSX.utils.sheet_to_json(first_sheet, { header: 1 })
       for (let item of aoo) {
@@ -115,7 +116,8 @@ class handleFile {
   async outputFile(res, outPath, fileName) {
     const SHEET = XLSX.utils.aoa_to_sheet(res)
     let date = new Date()
-    date = date.toLocaleString().replace(/[\s\/]/g, '-')
+    date = date.toLocaleString().replace(/[\s\/\:]/g, '-')
+    // console.log(date)
     let outputPath = `${outPath}\\${date}_${fileName}.xlsx`
     const BOOK = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(BOOK, SHEET, 'Data')
@@ -128,7 +130,7 @@ class handleFile {
       type: 'success',
       duration: 3000
     })
-    shell.openPath(outPath)
+    // shell.openPath(outPath)
   }
 
   output(selectedHead, outPath, opts) {
@@ -145,9 +147,9 @@ class handleFile {
     let ProcessedSheet
     let filterList = []
     //总表处理
-    for (let fileIndex = 0; fileIndex < this.mainFileList.length; fileIndex++) {
+    for (let file of this.mainFileList) {
       let fileHeads = []
-      let xdata = XLSX.readFile(this.mainFileList[fileIndex])
+      let xdata = XLSX.readFile(file)
       const first_sheet = xdata.Sheets[xdata.SheetNames[0]]
       const aoo = XLSX.utils.sheet_to_json(first_sheet, { header: 1, raw: false })
       for (let item of aoo) {
@@ -218,23 +220,89 @@ class handleFile {
           }
         }
       }
-    ProcessedSheet = this.fillList(ProcessedSheet)
+      ProcessedSheet = this.fillList(ProcessedSheet)
+      //高级选项输出
       if (opts[0].enable) {
+        filterList = [[]]
         let searchItemIndex = []
-        searchItemIndex = ProcessedSheet[0].filter((item) => item.match(/手术名称|手术日期|麻醉方式/))
+        for (let selectItem of selectedHead) {
+          filterList[0].push(selectItem.label)
+        }
+        searchItemIndex = aoo[0].filter((item) => item.match(/手术名称|手术日期|麻醉方式/))
         let reg = new RegExp(opts[0].value)
         for (let item of searchItemIndex) {
-          for (let i = 1; i < ProcessedSheet.length; i++) {
-            if (`${ProcessedSheet[i][ProcessedSheet[0].indexOf(item)]}`.match(reg)) {
+          for (let i = 1; i < aoo.length; i++) {
+            if (`${aoo[i][aoo[0].indexOf(item)]}`.match(reg)) {
               filterList.push([])
               for (let selectItem of selectedHead) {
-                filterList[filterList.length - 1].push(ProcessedSheet[i][ProcessedSheet[0].indexOf(selectItem.label)])
+                filterList[filterList.length - 1].push(aoo[i][aoo[0].indexOf(selectItem.label)])
               }
             }
           }
         }
+      } else {
+        filterList = aoo
       }
+      // console.log(ProcessedSheet)
+      // console.log(filterList)
       if (opts[1].enable) {
+        let idIndex = filterList[0].indexOf('住院号')
+        for (let filterItem of filterList) {
+          let filterId = filterItem[idIndex]
+          let dateIndex = 0
+          if (filterId) {
+            let reg = new RegExp(filterId)
+            let matchList = this.detailsFileList.filter((item) => {
+              return item.name.match(reg)
+            })
+            if (matchList.length == 0) {
+              continue
+            }
+            let xdata = XLSX.readFile(matchList[0].path)
+            const first_sheetD = xdata.Sheets[xdata.SheetNames[0]]
+            // xdata = null
+            const aooD = XLSX.utils.sheet_to_json(first_sheetD, { header: 1, raw: false })
+            // first_sheetD = null
+            let startIndex = 0
+            for (let detailsFileIndex = 0; detailsFileIndex < aooD.length; detailsFileIndex++) {
+              if (aooD[detailsFileIndex].indexOf('住院号') != -1) {
+                startIndex = detailsFileIndex + 1
+                dateIndex = aooD[detailsFileIndex].indexOf('检查日期')
+                filterList[0].push(...aooD[detailsFileIndex])
+                break
+              }
+            }
+            for (let i = 0; i < startIndex; i++) {
+              aooD.shift()
+            }
+            let TimeSortList = this.sortDetailsList(aooD, dateIndex)
+            for(let item of TimeSortList){
+              if(item[dateIndex]){
+                filterItem.push(...item)
+                break;
+              }
+            }
+          }
+        }
+        return
+        for (let file of this.detailsFileList) {
+          let fileHeads = []
+          let xdata = XLSX.readFile(file.path)
+          for (let i = 0; i < selectedHead.length; i++) {
+            if (fileHeads.indexOf(selectedHead[i].label) != -1) {
+              let tempCol = []
+              for (let item of aoo) {
+                tempCol.push(item[fileHeads.indexOf(selectedHead[i].label)])
+              }
+              res.push(tempCol)
+            }
+          }
+          res = res[0].map((col, i) => {
+            return res.map((row) => {
+              return row[i]
+            })
+          })
+        }
       }
       xdata = null
     }
@@ -242,17 +310,15 @@ class handleFile {
       this.outputFile(filterList, outPath, '总表数据(高级筛选)')
     }
     this.outputFile(ProcessedSheet, outPath, '总表数据')
-    //个人表单处理
     return
   }
-  updateDetails(detailsList) {
+  updateDetails(opts) {
     this.detailsFilterList = [...detailsList.value]
-    // console.log(this.detailsFilterList)
   }
-  // @param list [[]]
+
   fillList(list) {
     let maxLength = 0
-    console.log(list)
+    // console.log(list)
     for (let item of list) {
       if (item.length > maxLength) {
         maxLength = item.length
@@ -261,11 +327,31 @@ class handleFile {
     for (let item of list) {
       if (item.length < maxLength) {
         for (let i = item.length; i < maxLength; i++) {
-          item.push('')
+          item.push('-')
         }
       }
     }
-    return list;
+    return list
+  }
+  sortDetailsList(list, dateIndex) {
+    list.sort((a, b) => {
+      let aDate, bDate
+      if (a[dateIndex]) {
+        aDate = Date.parse(a[dateIndex])
+      } else {
+        aDate = new Date()
+        // console.log(aDate)
+      }
+      if (b[dateIndex]) {
+        bDate = Date.parse(b[dateIndex])
+      } else {
+        bDate = new Date()
+        // console.log(bDate)
+      }
+      return bDate - aDate
+    })
+    // console.log(list)
+    return list
   }
 }
 
