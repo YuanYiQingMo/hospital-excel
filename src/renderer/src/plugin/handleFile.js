@@ -130,7 +130,7 @@ class handleFile {
       type: 'success',
       duration: 3000
     })
-    // shell.openPath(outPath)
+    shell.openPath(outPath)
   }
 
   output(selectedHead, outPath, opts) {
