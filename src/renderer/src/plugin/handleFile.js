@@ -320,7 +320,6 @@ class handleFile {
               if(!SearchRow.length){
                 continue;
               }
-              // console.log(ProcessedSheet)
               row[ProcessedSheet[0].indexOf(item)] = SearchRow[fillDetailsHeadList.indexOf(this.detailsSearchHead)]
               
             }
