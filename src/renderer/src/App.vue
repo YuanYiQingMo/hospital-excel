@@ -29,6 +29,13 @@ const opts = ref([
     description: '选择需要导出的项(导出最近一次检查结果)',
     value: [],
     enable: false
+  },
+  {
+    key: 2,
+    label: '填充总表',
+    description: '根据总表中存在的表头,寻找患者个人表中存在该表头文字的行,并将所选列的值填充在导出的总表中(取时间最近的一次) (精准匹配,需要较长时间)',
+    value: '',
+    enable: false
   }
 ])
 
@@ -141,7 +148,7 @@ const selectedHeadChange = (
 const updateDetailsList = () => {
   const FileHandler = new handleFile();
   // console.log()
-  FileHandler.updateDetails(opts.value[1])
+  FileHandler.updateDetails(opts.value[2])
 }
 onMounted(() => {
   init()
@@ -224,12 +231,11 @@ onMounted(() => {
                   placeholder="输入要匹配的文字"
                 />
                 <!-- TODO提取病人信息 -->
-                <!-- <el-select
+                <el-select
                   @change="updateDetailsList"
-                  v-show="item.key == 1"
+                  v-show="item.key == 2"
                   v-model="item.value"
-                  multiple
-                  placeholder="选取病人信息"
+                  placeholder="选取要提取的信息"
                   style="width: 100%"
                 >
                   <el-option
@@ -238,7 +244,7 @@ onMounted(() => {
                     :label="detail.label"
                     :value="detail.value"
                   />
-                </el-select> -->
+                </el-select>
               </el-col>
             </el-row>
           </el-col>

@@ -1,34 +1,3 @@
-# electron-app
-
-An Electron application with Vue
-
-## Recommended IDE Setup
-
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
-
-## Project Setup
-
-### Install
-
-```bash
-$ npm install
-```
-
-### Development
-
-```bash
-$ npm run dev
-```
-
-### Build
-
-```bash
-# For windows
-$ npm run build:win
-
-# For macOS
-$ npm run build:mac
-
-# For Linux
-$ npm run build:linux
-```
+# Update 
+-feature 提供一个从患者个人表查询总表表头的按钮,查询按时间排序最早的一次数据,不会添加没有检查日期的数据,检查日期不存在的情况下会出错
+-fixed 修复在没有选择住院时间时会出现多于表头的问题

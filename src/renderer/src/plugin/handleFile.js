@@ -153,7 +153,7 @@ class handleFile {
       const first_sheet = xdata.Sheets[xdata.SheetNames[0]]
       const aoo = XLSX.utils.sheet_to_json(first_sheet, { header: 1, raw: false })
       for (let item of aoo) {
-        if (item.length == 1) {
+        if (item.indexOf('住院号') == -1) {
           continue
         }
         fileHeads.push(...item)
@@ -181,9 +181,9 @@ class handleFile {
         ProcessedSheet.push(res[i])
         count = 0
         if (
-          res[i][res[0].indexOf('手术名称')] != -1 ||
-          res[i][res[0].indexOf('手术日期')] != -1 ||
-          res[i][res[0].indexOf('麻醉方式')] != -1
+          res[0].indexOf('手术名称') != -1 ||
+          res[0].indexOf('手术日期') != -1 ||
+          res[0].indexOf('麻醉方式') != -1
         ) {
           while (
             i + 1 < res.length &&
@@ -221,6 +221,7 @@ class handleFile {
         }
       }
       ProcessedSheet = this.fillList(ProcessedSheet)
+      // console.log(ProcessedSheet)
       //高级选项输出
       if (opts[0].enable) {
         filterList = [[]]
@@ -260,9 +261,7 @@ class handleFile {
             }
             let xdata = XLSX.readFile(matchList[0].path)
             const first_sheetD = xdata.Sheets[xdata.SheetNames[0]]
-            // xdata = null
             const aooD = XLSX.utils.sheet_to_json(first_sheetD, { header: 1, raw: false })
-            // first_sheetD = null
             let startIndex = 0
             for (let detailsFileIndex = 0; detailsFileIndex < aooD.length; detailsFileIndex++) {
               if (aooD[detailsFileIndex].indexOf('住院号') != -1) {
@@ -276,44 +275,80 @@ class handleFile {
               aooD.shift()
             }
             let TimeSortList = this.sortDetailsList(aooD, dateIndex)
-            for(let item of TimeSortList){
-              if(item[dateIndex]){
+            for (let item of TimeSortList) {
+              if (item[dateIndex]) {
                 filterItem.push(...item)
-                break;
+                break
               }
             }
           }
         }
-        return
-        for (let file of this.detailsFileList) {
-          let fileHeads = []
-          let xdata = XLSX.readFile(file.path)
-          for (let i = 0; i < selectedHead.length; i++) {
-            if (fileHeads.indexOf(selectedHead[i].label) != -1) {
-              let tempCol = []
-              for (let item of aoo) {
-                tempCol.push(item[fileHeads.indexOf(selectedHead[i].label)])
+      }
+
+      if (opts[2].enable) {
+        let idIndex = ProcessedSheet[0].indexOf('住院号')
+        for (let row of ProcessedSheet) {
+          let filterId = row[idIndex]
+          let dateIndex = 0
+          if (filterId) {
+            let reg = new RegExp(filterId)
+            let matchList = this.detailsFileList.filter((item) => {
+              return item.name.match(reg)
+            })
+            if (matchList.length == 0) {
+              continue
+            }
+            let fillDetailsHeadList = []
+            let xdata = XLSX.readFile(matchList[0].path)
+            const first_sheetF = xdata.Sheets[xdata.SheetNames[0]]
+            const aooF = XLSX.utils.sheet_to_json(first_sheetF, { header: 1, raw: false })
+            let startIndex = 0
+            for (let detailsFileIndex = 0; detailsFileIndex < aooF.length; detailsFileIndex++) {
+              if (aooF[detailsFileIndex].indexOf('住院号') != -1) {
+                startIndex = detailsFileIndex + 1
+                dateIndex = aooF[detailsFileIndex].indexOf('检查日期')
+                fillDetailsHeadList.push(...aooF[detailsFileIndex])
+                break
               }
-              res.push(tempCol)
+            }
+            for (let i = 0; i < startIndex; i++) {
+              aooF.shift()
+            }
+            let TimeSortList = this.sortDetailsList(aooF, dateIndex)
+            for (let item of ProcessedSheet[0]) {
+              let SearchRow = this.searchItemInList(TimeSortList, item)
+              if(!SearchRow.length){
+                continue;
+              }
+              // console.log(ProcessedSheet)
+              row[ProcessedSheet[0].indexOf(item)] = SearchRow[fillDetailsHeadList.indexOf(this.detailsSearchHead)]
+              
             }
           }
-          res = res[0].map((col, i) => {
-            return res.map((row) => {
-              return row[i]
-            })
-          })
         }
       }
       xdata = null
     }
-    if (filterList.length != 0) {
+    if (opts[0].enable || opts[1].enable) {
       this.outputFile(filterList, outPath, '总表数据(高级筛选)')
     }
     this.outputFile(ProcessedSheet, outPath, '总表数据')
     return
   }
   updateDetails(opts) {
-    this.detailsFilterList = [...detailsList.value]
+    this.detailsSearchHead = opts.value
+  }
+
+  searchItemInList(list, head) {
+    // console.log(list, head)
+    for (let row of list) {
+      for (let item of row) {
+        if (item == head) {
+          return row
+        }
+      }
+    }
+    return []
   }
 
   fillList(list) {
@@ -327,7 +362,7 @@ class handleFile {
     for (let item of list) {
       if (item.length < maxLength) {
         for (let i = item.length; i < maxLength; i++) {
-          item.push('-')
+          item.push(undefined)
         }
       }
     }
@@ -340,17 +375,14 @@ class handleFile {
         aDate = Date.parse(a[dateIndex])
       } else {
         aDate = new Date()
-        // console.log(aDate)
       }
       if (b[dateIndex]) {
         bDate = Date.parse(b[dateIndex])
       } else {
         bDate = new Date()
-        // console.log(bDate)
       }
       return bDate - aDate
     })
-    // console.log(list)
     return list
   }
 }
