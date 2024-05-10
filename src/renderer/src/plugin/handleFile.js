@@ -13,6 +13,8 @@ class handleFile {
     if (instance) return instance
     instance = this
 
+    this.processedCount = 0
+
     this.mainPath = mainPath
     this.detailsPath = detailsPath
     this.mainFileList = []
@@ -113,6 +115,48 @@ class handleFile {
     return res
   }
 
+  getMainDateList() {
+    let dateHeadList = []
+    for (let date of this.headMainList) {
+      if (date.match(/日期/)) {
+        dateHeadList.push(date)
+      }
+    }
+    const strings = dateHeadList.map((item) => JSON.stringify(item))
+    const removeDupList = [...new Set(strings)]
+    const result = removeDupList.map((item) => JSON.parse(item))
+    let res = []
+    // type 1：文本 2：数字 3：日期
+    for (let i = 0; i < result.length; i++) {
+      res.push({
+        key: result[i],
+        label: result[i],
+        value: result[i]
+      })
+    }
+    return res
+  }
+  getDetailsDateList() {
+    let dateHeadList = []
+    for (let date of this.detailsHeadList) {
+      if (date.match(/日期/)) {
+        dateHeadList.push(date)
+      }
+    }
+    const strings = dateHeadList.map((item) => JSON.stringify(item))
+    const removeDupList = [...new Set(strings)]
+    const result = removeDupList.map((item) => JSON.parse(item))
+    let res = []
+    // type 1：文本 2：数字 3：日期
+    for (let i = 0; i < result.length; i++) {
+      res.push({
+        key: result[i],
+        label: result[i],
+        value: result[i]
+      })
+    }
+    return res
+  }
   async outputFile(res, outPath, fileName) {
     const SHEET = XLSX.utils.aoa_to_sheet(res)
     let date = new Date()
@@ -134,6 +178,7 @@ class handleFile {
   }
 
   output(selectedHead, outPath, opts) {
+    this.processedCount = 0
     if (selectedHead[0].label != '住院号') {
       ElNotification({
         title: '请勾选住院号',
@@ -221,7 +266,6 @@ class handleFile {
         }
       }
       ProcessedSheet = this.fillList(ProcessedSheet)
-      // console.log(ProcessedSheet)
       //高级选项输出
       if (opts[0].enable) {
         filterList = [[]]
@@ -244,8 +288,6 @@ class handleFile {
       } else {
         filterList = aoo
       }
-      // console.log(ProcessedSheet)
-      // console.log(filterList)
       if (opts[1].enable) {
         let idIndex = filterList[0].indexOf('住院号')
         for (let filterItem of filterList) {
@@ -290,6 +332,7 @@ class handleFile {
         for (let row of ProcessedSheet) {
           let filterId = row[idIndex]
           let dateIndex = 0
+          let mainDateIndex, detailsDateIndex
           if (filterId) {
             let reg = new RegExp(filterId)
             let matchList = this.detailsFileList.filter((item) => {
@@ -307,6 +350,10 @@ class handleFile {
               if (aooF[detailsFileIndex].indexOf('住院号') != -1) {
                 startIndex = detailsFileIndex + 1
                 dateIndex = aooF[detailsFileIndex].indexOf('检查日期')
+                if (opts[3].enable) {
+                  mainDateIndex = ProcessedSheet[0].indexOf(opts[3].selectedDate.startDate)
+                  detailsDateIndex = aooF[detailsFileIndex].indexOf(opts[3].selectedDate.lastDate)
+                }
                 fillDetailsHeadList.push(...aooF[detailsFileIndex])
                 break
               }
@@ -314,19 +361,33 @@ class handleFile {
             for (let i = 0; i < startIndex; i++) {
               aooF.shift()
             }
-            let TimeSortList = this.sortDetailsList(aooF, dateIndex)
+            let TimeSortList = []
+            if (opts[3].enable) {
+              TimeSortList = this.sortDetailsListByTime(
+                aooF,
+                row,
+                opts[3].selectedDate.isSequence,
+                mainDateIndex,
+                detailsDateIndex
+              )
+            } else {
+              TimeSortList = this.sortDetailsList(aooF, dateIndex)
+            }
             for (let item of ProcessedSheet[0]) {
               let SearchRow = this.searchItemInList(TimeSortList, item)
-              if(!SearchRow.length){
-                continue;
+              // console.log(SearchRow)
+              if (!SearchRow.length) {
+                continue
               }
-              row[ProcessedSheet[0].indexOf(item)] = SearchRow[fillDetailsHeadList.indexOf(this.detailsSearchHead)]
-              
+              row[ProcessedSheet[0].indexOf(item)] =
+                SearchRow[fillDetailsHeadList.indexOf(this.detailsSearchHead)]
             }
           }
         }
+        this.processedCount ++;
       }
       xdata = null
+      this.processedCount ++;
     }
     if (opts[0].enable || opts[1].enable) {
       this.outputFile(filterList, outPath, '总表数据(高级筛选)')
@@ -334,8 +395,18 @@ class handleFile {
     this.outputFile(ProcessedSheet, outPath, '总表数据')
     return
   }
+
   updateDetails(opts) {
     this.detailsSearchHead = opts.value
+  }
+
+  getTotalFileCount(){
+    return this.mainFileList.length + this.detailsFileList.length
+  }
+
+  updateDate(opts) {
+    this.dateFirst = opts.selectedDate.startDate
+    this.dateLast = opts.selectedDate.lastData
   }
 
   searchItemInList(list, head) {
@@ -367,6 +438,7 @@ class handleFile {
     }
     return list
   }
+
   sortDetailsList(list, dateIndex) {
     list.sort((a, b) => {
       let aDate, bDate
@@ -382,6 +454,45 @@ class handleFile {
       }
       return bDate - aDate
     })
+    return list
+  }
+
+  sortDetailsListByTime(list, mainListRow, isSequence, mainDateIndex, detailsDateIndex) {
+    list.sort((a, b) => {
+      let aDate, bDate
+      if (a[detailsDateIndex]) {
+        aDate = Date.parse(a[detailsDateIndex])
+      } else {
+        aDate = new Date()
+      }
+      if (b[detailsDateIndex]) {
+        bDate = Date.parse(b[detailsDateIndex])
+      } else {
+        bDate = new Date()
+      }
+      if(isSequence){
+        return bDate - aDate //早->晚
+      }else{
+        return aDate - bDate
+      }
+    })
+    let mainDate =  mainListRow[mainDateIndex] ? Date.parse(mainListRow[mainDateIndex]) : new Date()
+    // console.log(mainDate)
+    for (let date of list) {
+      if(isSequence){
+        if(!date[detailsDateIndex] || mainDate -  Date.parse(date[detailsDateIndex])< 0){
+          list.shift()
+        }else{
+          break
+        }
+      }else{
+        if (date[detailsDateIndex] || mainDate - Date.parse(date[detailsDateIndex]) > 0) {
+          list.shift()
+        }else{
+          break
+        }
+      }
+    }
     return list
   }
 }

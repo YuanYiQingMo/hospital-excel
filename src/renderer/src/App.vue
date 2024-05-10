@@ -5,6 +5,15 @@ import { h } from 'vue'
 import { ElNotification } from 'element-plus'
 // import { filterFields } from 'element-plus/es/components/form/src/utils.mjs'
 
+
+const colors = [
+  { color: '#f56c6c', percentage: 20 },
+  { color: '#e6a23c', percentage: 40 },
+  { color: '#5cb87a', percentage: 60 },
+  { color: '#1989fa', percentage: 80 },
+  { color: '#6f7ad3', percentage: 100 },
+]
+
 let homeDir = ''
 let mainPath = ''
 let detailPath = ''
@@ -15,27 +24,44 @@ const updateComplete = ref(false)
 const selectedHead = ref([])
 const selectedHeadIndex = ref([])
 const detailList = ref([])
+const dateMainList = ref([])
+const dateDetailsList = ref([])
+
+const percentage = ref(0)
+
 const opts = ref([
   {
     key: 0,
     label: '手术信息提取',
     description: '提取含有关键词的手术信息（请确保勾选手术日期、手术方式、麻醉方式三项）',
     value: '',
-    enable: false
+    enable: false,
+    selectedDate: { startData: '', lastDate: '', isSequence: true }
   },
   {
     key: 1,
     label: '导出病人表单数据',
     description: '选择需要导出的项(导出最近一次检查结果)',
     value: [],
-    enable: false
+    enable: false,
+    selectedDate: { startData: '', lastDate: '', isSequence: true }
   },
   {
     key: 2,
     label: '填充总表',
-    description: '根据总表中存在的表头,寻找患者个人表中存在该表头文字的行,并将所选列的值填充在导出的总表中(取时间最近的一次) (精准匹配,需要较长时间)',
+    description:
+      '根据总表中存在的表头,寻找患者个人表中存在该表头文字的行,并将所选列的值填充在导出的总表中(取时间最近的一次) (精准匹配,需要较长时间)',
     value: '',
-    enable: false
+    enable: false,
+    selectedDate: { startData: '', lastDate: '', isSequence: true }
+  },
+  {
+    key: 3,
+    label: '时间比对',
+    description: '查询所有日期字段,对比时间最近的一次,使用前勾选填充总表选择要填写入的数据',
+    value: '',
+    enable: false,
+    selectedDate: { startData: '', lastDate: '', isSequence: true }
   }
 ])
 
@@ -122,12 +148,16 @@ const analysis = () => {
   // console.log(data)
   headerList.value = FileHandler.getMainHeader()
   detailList.value = FileHandler.getDetailsHeader()
+  dateMainList.value = FileHandler.getMainDateList()
+  dateDetailsList.value = FileHandler.getDetailsDateList()
+  // console.log(dateList)
   updateComplete.value = true
   // console.log(selectedHead)
 }
 
 const output = () => {
   const FileHandler = new handleFile()
+  // updatePer()
   FileHandler.output([...selectedHead.value], outputPath, [...opts.value])
 }
 
@@ -146,10 +176,25 @@ const selectedHeadChange = (
 }
 
 const updateDetailsList = () => {
-  const FileHandler = new handleFile();
+  const FileHandler = new handleFile()
   // console.log()
   FileHandler.updateDetails(opts.value[2])
 }
+const updateDateList = () => {
+  const FileHandler = new handleFile()
+  // console.log(opts.value[3])
+  FileHandler.updateDate(opts.value[3])
+}
+
+const updatePer = () => {
+  const FileHandler = new handleFile()
+  let total = FileHandler.getTotalFileCount()
+  setInterval(() => {
+    percentage.value = FileHandler.processedCount / total * 100
+  },500)
+  
+}
+
 onMounted(() => {
   init()
 })
@@ -219,10 +264,13 @@ onMounted(() => {
               <el-col style="font-weight: bolder" :span="4">
                 {{ item.label }}
               </el-col>
-              <el-col style="font-size: 12px; display: flex; justify-content: center; color: yellow;" :span="10">
+              <el-col
+                style="font-size: 12px; display: flex; justify-content: center; color: yellow"
+                :span="8"
+              >
                 {{ item.description }}
               </el-col>
-              <el-col :span="8">
+              <el-col :span="10">
                 <!-- 手术信息提取 -->
                 <el-input
                   v-show="item.key == 0"
@@ -230,7 +278,7 @@ onMounted(() => {
                   style="width: 100%"
                   placeholder="输入要匹配的文字"
                 />
-                <!-- TODO提取病人信息 -->
+                <!-- 提取单独表格数据 -->
                 <el-select
                   @change="updateDetailsList"
                   v-show="item.key == 2"
@@ -245,7 +293,40 @@ onMounted(() => {
                     :value="detail.value"
                   />
                 </el-select>
+                <!-- 日期选取 -->
+                <el-row justify="space-around" v-show="item.key == 3">
+                  <el-select
+                    v-model="item.selectedDate.startData"
+                    placeholder="基准日期"
+                    style="width: 40%"
+                    @change="updateDateList"
+                  >
+                    <el-option
+                      v-for="date in dateMainList"
+                      :key="date.value"
+                      :label="date.label"
+                      :value="date.value"
+                    ></el-option>
+                  </el-select>
+                  <el-select
+                    v-model="item.selectedDate.lastDate"
+                    placeholder="对比日期"
+                    style="width: 40%"
+                    @change="updateDateList"
+                  >
+                    <el-option
+                      v-for="date in dateDetailsList"
+                      :key="date.value"
+                      :label="date.label"
+                      :value="date.value"
+                    ></el-option>
+                  </el-select>
+                  <el-tooltip content="关闭这个按钮以导出距离基准日期之后最近的日期" placement="top">
+                    <el-switch v-model="item.selectedDate.isSequence" />
+                  </el-tooltip>
+                </el-row>
               </el-col>
+              <el-divider></el-divider>
             </el-row>
           </el-col>
         </el-row>
@@ -261,4 +342,7 @@ onMounted(() => {
       <a style="color: red" @click="output">导出总表</a>
     </el-tooltip>
   </div>
+  <!-- <div id="dashboard">
+    <el-progress type="dashboard" :percentage="percentage" :color="colors" />
+  </div> -->
 </template>
