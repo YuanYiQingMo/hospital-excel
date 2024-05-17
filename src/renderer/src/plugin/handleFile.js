@@ -476,6 +476,7 @@ class handleFile {
         return aDate - bDate
       }
     })
+    console.log(list)
     let mainDate =  mainListRow[mainDateIndex] ? Date.parse(mainListRow[mainDateIndex]) : new Date()
     // console.log(mainDate)
     for (let date of list) {
@@ -486,7 +487,7 @@ class handleFile {
           break
         }
       }else{
-        if (date[detailsDateIndex] || mainDate - Date.parse(date[detailsDateIndex]) > 0) {
+        if (!date[detailsDateIndex] || mainDate - Date.parse(date[detailsDateIndex]) > 0) {
           list.shift()
         }else{
           break
