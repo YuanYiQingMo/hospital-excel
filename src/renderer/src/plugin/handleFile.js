@@ -351,8 +351,11 @@ class handleFile {
                 startIndex = detailsFileIndex + 1
                 dateIndex = aooF[detailsFileIndex].indexOf('检查日期')
                 if (opts[3].enable) {
-                  mainDateIndex = ProcessedSheet[0].indexOf(opts[3].selectedDate.startDate)
+                  console.log(opts[3].selectedDate.startData,ProcessedSheet)
+                  mainDateIndex = ProcessedSheet[0].indexOf(opts[3].selectedDate.startData)
+
                   detailsDateIndex = aooF[detailsFileIndex].indexOf(opts[3].selectedDate.lastDate)
+                  // console.log(mainDateIndex,detailsDateIndex)
                 }
                 fillDetailsHeadList.push(...aooF[detailsFileIndex])
                 break
@@ -405,8 +408,8 @@ class handleFile {
   }
 
   updateDate(opts) {
-    this.dateFirst = opts.selectedDate.startDate
-    this.dateLast = opts.selectedDate.lastData
+    this.dateFirst = opts.selectedDate.startData
+    this.dateLast = opts.selectedDate.lastDate
   }
 
   searchItemInList(list, head) {
@@ -476,23 +479,28 @@ class handleFile {
         return aDate - bDate
       }
     })
-    console.log(list)
     let mainDate =  mainListRow[mainDateIndex] ? Date.parse(mainListRow[mainDateIndex]) : new Date()
-    // console.log(mainDate)
+    console.log(mainDate)
+    let shiftCount = 0
     for (let date of list) {
+      // console.log(mainDate, date[detailsDateIndex] , mainDate -  Date.parse(date[detailsDateIndex]))
       if(isSequence){
-        if(!date[detailsDateIndex] || mainDate -  Date.parse(date[detailsDateIndex])< 0){
-          list.shift()
+        if(!date[detailsDateIndex] || mainDate -  Date.parse(date[detailsDateIndex]) < 0){
+          shiftCount ++
         }else{
           break
         }
       }else{
+        console.log(mainDate,list[0], date[detailsDateIndex])
         if (!date[detailsDateIndex] || mainDate - Date.parse(date[detailsDateIndex]) > 0) {
-          list.shift()
+          shiftCount ++
         }else{
           break
         }
       }
+    }
+    for(let i = 0; i < shiftCount; i++){
+      list.shift()
     }
     return list
   }
